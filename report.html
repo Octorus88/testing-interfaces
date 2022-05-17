@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Test Report</title>
+    <style>body {
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  /* do not increase min-width as some may use split screens */
+  min-width: 800px;
+  color: #999;
+}
+
+h1 {
+  font-size: 24px;
+  color: black;
+}
+
+h2 {
+  font-size: 16px;
+  color: black;
+}
+
+p {
+  color: black;
+}
+
+a {
+  color: #999;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+/******************************
+ * SUMMARY INFORMATION
+ ******************************/
+#environment td {
+  padding: 5px;
+  border: 1px solid #E6E6E6;
+}
+#environment tr:nth-child(odd) {
+  background-color: #f6f6f6;
+}
+
+/******************************
+ * TEST RESULT COLORS
+ ******************************/
+span.passed,
+.passed .col-result {
+  color: green;
+}
+
+span.skipped,
+span.xfailed,
+span.rerun,
+.skipped .col-result,
+.xfailed .col-result,
+.rerun .col-result {
+  color: orange;
+}
+
+span.error,
+span.failed,
+span.xpassed,
+.error .col-result,
+.failed .col-result,
+.xpassed .col-result {
+  color: red;
+}
+
+/******************************
+ * RESULTS TABLE
+ *
+ * 1. Table Layout
+ * 2. Extra
+ * 3. Sorting items
+ *
+ ******************************/
+/*------------------
+ * 1. Table Layout
+ *------------------*/
+#results-table {
+  border: 1px solid #e6e6e6;
+  color: #999;
+  font-size: 12px;
+  width: 100%;
+}
+#results-table th,
+#results-table td {
+  padding: 5px;
+  border: 1px solid #E6E6E6;
+  text-align: left;
+}
+#results-table th {
+  font-weight: bold;
+}
+
+/*------------------
+ * 2. Extra
+ *------------------*/
+.log {
+  background-color: #e6e6e6;
+  border: 1px solid #e6e6e6;
+  color: black;
+  display: block;
+  font-family: "Courier New", Courier, monospace;
+  height: 230px;
+  overflow-y: scroll;
+  padding: 5px;
+  white-space: pre-wrap;
+}
+.log:only-child {
+  height: inherit;
+}
+
+div.image {
+  border: 1px solid #e6e6e6;
+  float: right;
+  height: 240px;
+  margin-left: 5px;
+  overflow: hidden;
+  width: 320px;
+}
+div.image img {
+  width: 320px;
+}
+
+div.video {
+  border: 1px solid #e6e6e6;
+  float: right;
+  height: 240px;
+  margin-left: 5px;
+  overflow: hidden;
+  width: 320px;
+}
+div.video video {
+  overflow: hidden;
+  width: 320px;
+  height: 240px;
+}
+
+.collapsed {
+  display: none;
+}
+
+.expander::after {
+  content: " (show details)";
+  color: #BBB;
+  font-style: italic;
+  cursor: pointer;
+}
+
+.collapser::after {
+  content: " (hide details)";
+  color: #BBB;
+  font-style: italic;
+  cursor: pointer;
+}
+
+/*------------------
+ * 3. Sorting items
+ *------------------*/
+.sortable {
+  cursor: pointer;
+}
+
+.sort-icon {
+  font-size: 0px;
+  float: left;
+  margin-right: 5px;
+  margin-top: 5px;
+  /*triangle*/
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+}
+.inactive .sort-icon {
+  /*finish triangle*/
+  border-top: 8px solid #E6E6E6;
+}
+.asc.active .sort-icon {
+  /*finish triangle*/
+  border-bottom: 8px solid #999;
+}
+.desc.active .sort-icon {
+  /*finish triangle*/
+  border-top: 8px solid #999;
+}
+</style></head>
+  <body onLoad="init()">
+    <script>/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+
+function toArray(iter) {
+    if (iter === null) {
+        return null;
+    }
+    return Array.prototype.slice.call(iter);
+}
+
+function find(selector, elem) { // eslint-disable-line no-redeclare
+    if (!elem) {
+        elem = document;
+    }
+    return elem.querySelector(selector);
+}
+
+function findAll(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return toArray(elem.querySelectorAll(selector));
+}
+
+function sortColumn(elem) {
+    toggleSortStates(elem);
+    const colIndex = toArray(elem.parentNode.childNodes).indexOf(elem);
+    let key;
+    if (elem.classList.contains('result')) {
+        key = keyResult;
+    } else if (elem.classList.contains('links')) {
+        key = keyLink;
+    } else {
+        key = keyAlpha;
+    }
+    sortTable(elem, key(colIndex));
+}
+
+function showAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(showExtras);
+}
+
+function hideAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(hideExtras);
+}
+
+function showExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.remove('collapsed');
+    expandcollapse.classList.remove('expander');
+    expandcollapse.classList.add('collapser');
+}
+
+function hideExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.add('collapsed');
+    expandcollapse.classList.remove('collapser');
+    expandcollapse.classList.add('expander');
+}
+
+function showFilters() {
+    const filterItems = document.getElementsByClassName('filter');
+    for (let i = 0; i < filterItems.length; i++)
+        filterItems[i].hidden = false;
+}
+
+function addCollapse() {
+    // Add links for show/hide all
+    const resulttable = find('table#results-table');
+    const showhideall = document.createElement('p');
+    showhideall.innerHTML = '<a href="javascript:showAllExtras()">Show all details</a> / ' +
+                            '<a href="javascript:hideAllExtras()">Hide all details</a>';
+    resulttable.parentElement.insertBefore(showhideall, resulttable);
+
+    // Add show/hide link to each result
+    findAll('.col-result').forEach(function(elem) {
+        const collapsed = getQueryParameter('collapsed') || 'Passed';
+        const extras = elem.parentNode.nextElementSibling;
+        const expandcollapse = document.createElement('span');
+        if (extras.classList.contains('collapsed')) {
+            expandcollapse.classList.add('expander');
+        } else if (collapsed.includes(elem.innerHTML)) {
+            extras.classList.add('collapsed');
+            expandcollapse.classList.add('expander');
+        } else {
+            expandcollapse.classList.add('collapser');
+        }
+        elem.appendChild(expandcollapse);
+
+        elem.addEventListener('click', function(event) {
+            if (event.currentTarget.parentNode.nextElementSibling.classList.contains('collapsed')) {
+                showExtras(event.currentTarget);
+            } else {
+                hideExtras(event.currentTarget);
+            }
+        });
+    });
+}
+
+function getQueryParameter(name) {
+    const match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+
+function init () { // eslint-disable-line no-unused-vars
+    resetSortHeaders();
+
+    addCollapse();
+
+    showFilters();
+
+    sortColumn(find('.initial-sort'));
+
+    findAll('.sortable').forEach(function(elem) {
+        elem.addEventListener('click',
+            function() {
+                sortColumn(elem);
+            }, false);
+    });
+}
+
+function sortTable(clicked, keyFunc) {
+    const rows = findAll('.results-table-row');
+    const reversed = !clicked.classList.contains('asc');
+    const sortedRows = sort(rows, keyFunc, reversed);
+    /* Whole table is removed here because browsers acts much slower
+     * when appending existing elements.
+     */
+    const thead = document.getElementById('results-table-head');
+    document.getElementById('results-table').remove();
+    const parent = document.createElement('table');
+    parent.id = 'results-table';
+    parent.appendChild(thead);
+    sortedRows.forEach(function(elem) {
+        parent.appendChild(elem);
+    });
+    document.getElementsByTagName('BODY')[0].appendChild(parent);
+}
+
+function sort(items, keyFunc, reversed) {
+    const sortArray = items.map(function(item, i) {
+        return [keyFunc(item), i];
+    });
+
+    sortArray.sort(function(a, b) {
+        const keyA = a[0];
+        const keyB = b[0];
+
+        if (keyA == keyB) return 0;
+
+        if (reversed) {
+            return keyA < keyB ? 1 : -1;
+        } else {
+            return keyA > keyB ? 1 : -1;
+        }
+    });
+
+    return sortArray.map(function(item) {
+        const index = item[1];
+        return items[index];
+    });
+}
+
+function keyAlpha(colIndex) {
+    return function(elem) {
+        return elem.childNodes[1].childNodes[colIndex].firstChild.data.toLowerCase();
+    };
+}
+
+function keyLink(colIndex) {
+    return function(elem) {
+        const dataCell = elem.childNodes[1].childNodes[colIndex].firstChild;
+        return dataCell == null ? '' : dataCell.innerText.toLowerCase();
+    };
+}
+
+function keyResult(colIndex) {
+    return function(elem) {
+        const strings = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed',
+            'Skipped', 'Passed'];
+        return strings.indexOf(elem.childNodes[1].childNodes[colIndex].firstChild.data);
+    };
+}
+
+function resetSortHeaders() {
+    findAll('.sort-icon').forEach(function(elem) {
+        elem.parentNode.removeChild(elem);
+    });
+    findAll('.sortable').forEach(function(elem) {
+        const icon = document.createElement('div');
+        icon.className = 'sort-icon';
+        icon.textContent = 'vvv';
+        elem.insertBefore(icon, elem.firstChild);
+        elem.classList.remove('desc', 'active');
+        elem.classList.add('asc', 'inactive');
+    });
+}
+
+function toggleSortStates(elem) {
+    //if active, toggle between asc and desc
+    if (elem.classList.contains('active')) {
+        elem.classList.toggle('asc');
+        elem.classList.toggle('desc');
+    }
+
+    //if inactive, reset all other functions and add ascending active
+    if (elem.classList.contains('inactive')) {
+        resetSortHeaders();
+        elem.classList.remove('inactive');
+        elem.classList.add('active');
+    }
+}
+
+function isAllRowsHidden(value) {
+    return value.hidden == false;
+}
+
+function filterTable(elem) { // eslint-disable-line no-unused-vars
+    const outcomeAtt = 'data-test-result';
+    const outcome = elem.getAttribute(outcomeAtt);
+    const classOutcome = outcome + ' results-table-row';
+    const outcomeRows = document.getElementsByClassName(classOutcome);
+
+    for(let i = 0; i < outcomeRows.length; i++){
+        outcomeRows[i].hidden = !elem.checked;
+    }
+
+    const rows = findAll('.results-table-row').filter(isAllRowsHidden);
+    const allRowsHidden = rows.length == 0 ? true : false;
+    const notFoundMessage = document.getElementById('not-found-message');
+    notFoundMessage.hidden = !allRowsHidden;
+}
+</script>
+    <h1>report.html</h1>
+    <p>Report generated on 17-May-2022 at 16:29:19 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a> v3.1.1</p>
+    <h2>Environment</h2>
+    <table id="environment">
+      <tr>
+        <td>Packages</td>
+        <td>{"pluggy": "1.0.0", "py": "1.11.0", "pytest": "7.1.2"}</td></tr>
+      <tr>
+        <td>Platform</td>
+        <td>macOS-12.3.1-arm64-arm-64bit</td></tr>
+      <tr>
+        <td>Plugins</td>
+        <td>{"html": "3.1.1", "metadata": "2.0.1"}</td></tr>
+      <tr>
+        <td>Python</td>
+        <td>3.8.9</td></tr></table>
+    <h2>Summary</h2>
+    <p>3 tests ran in 0.82 seconds. </p>
+    <p class="filter" hidden="true">(Un)check the boxes to filter the results.</p><input checked="true" class="filter" data-test-result="passed" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="passed">3 passed</span>, <input checked="true" class="filter" data-test-result="skipped" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="skipped">0 skipped</span>, <input checked="true" class="filter" data-test-result="failed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="failed">0 failed</span>, <input checked="true" class="filter" data-test-result="error" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="error">4 errors</span>, <input checked="true" class="filter" data-test-result="xfailed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xfailed">0 expected failures</span>, <input checked="true" class="filter" data-test-result="xpassed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xpassed">0 unexpected passes</span>
+    <h2>Results</h2>
+    <table id="results-table">
+      <thead id="results-table-head">
+        <tr>
+          <th class="sortable result initial-sort" col="result">Result</th>
+          <th class="sortable" col="name">Test</th>
+          <th class="sortable" col="duration">Duration</th>
+          <th class="sortable links" col="links">Links</th></tr>
+        <tr hidden="true" id="not-found-message">
+          <th colspan="4">No results found. Try to check the filters</th></tr></thead>
+      <tbody class="error results-table-row">
+        <tr>
+          <td class="col-result">Error</td>
+          <td class="col-name">test_usb.py::test_device::setup</td>
+          <td class="col-duration">0.02</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">@pytest.fixture<br/>    def device():<br/>&gt;       return usb.core.find(idVendor=0x8457, idProduct=0x10263)<br/><br/>test_usb.py:8: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>find_all = False, backend = None, custom_match = None, args = {&#x27;idProduct&#x27;: 66147, &#x27;idVendor&#x27;: 33879}<br/>device_iter = &lt;function find.&lt;locals&gt;.device_iter at 0x1056da670&gt;<br/>libusb1 = &lt;module &#x27;usb.backend.libusb1&#x27; from &#x27;/Users/aciden/Library/Python/3.8/lib/python/site-packages/usb/backend/libusb1.py&#x27;&gt;<br/>libusb0 = &lt;module &#x27;usb.backend.libusb0&#x27; from &#x27;/Users/aciden/Library/Python/3.8/lib/python/site-packages/usb/backend/libusb0.py&#x27;&gt;<br/>openusb = &lt;module &#x27;usb.backend.openusb&#x27; from &#x27;/Users/aciden/Library/Python/3.8/lib/python/site-packages/usb/backend/openusb.py&#x27;&gt;<br/>m = &lt;module &#x27;usb.backend.libusb0&#x27; from &#x27;/Users/aciden/Library/Python/3.8/lib/python/site-packages/usb/backend/libusb0.py&#x27;&gt;<br/><br/>    def find(find_all=False, backend = None, custom_match = None, **args):<br/>        r&quot;&quot;&quot;Find an USB device and return it.<br/>    <br/>        find() is the function used to discover USB devices.  You can pass as<br/>        arguments any combination of the USB Device Descriptor fields to match a<br/>        device. For example:<br/>    <br/>        find(idVendor=0x3f4, idProduct=0x2009)<br/>    <br/>        will return the Device object for the device with idVendor field equals<br/>        to 0x3f4 and idProduct equals to 0x2009.<br/>    <br/>        If there is more than one device which matchs the criteria, the first one<br/>        found will be returned. If a matching device cannot be found the function<br/>        returns None. If you want to get all devices, you can set the parameter<br/>        find_all to True, then find will return an iterator with all matched devices.<br/>        If no matching device is found, it will return an empty iterator. Example:<br/>    <br/>        for printer in find(find_all=True, bDeviceClass=7):<br/>            print (printer)<br/>    <br/>        This call will get all the USB printers connected to the system.  (actually<br/>        may be not, because some devices put their class information in the<br/>        Interface Descriptor).<br/>    <br/>        You can also use a customized match criteria:<br/>    <br/>        dev = find(custom_match = lambda d: d.idProduct=0x3f4 and d.idvendor=0x2009)<br/>    <br/>        A more accurate printer finder using a customized match would be like<br/>        so:<br/>    <br/>        def is_printer(dev):<br/>            import usb.util<br/>            if dev.bDeviceClass == 7:<br/>                return True<br/>            for cfg in dev:<br/>                if usb.util.find_descriptor(cfg, bInterfaceClass=7) is not None:<br/>                    return True<br/>    <br/>        for printer in find(find_all=True, custom_match = is_printer):<br/>            print (printer)<br/>    <br/>        Now even if the device class code is in the interface descriptor the<br/>        printer will be found.<br/>    <br/>        You can combine a customized match with device descriptor fields. In this<br/>        case, the fields must match and the custom_match must return True. In the<br/>        our previous example, if we would like to get all printers belonging to the<br/>        manufacturer 0x3f4, the code would be like so:<br/>    <br/>        printers = list(find(find_all=True, idVendor=0x3f4, custom_match=is_printer))<br/>    <br/>        If you want to use find as a &#x27;list all devices&#x27; function, just call<br/>        it with find_all = True:<br/>    <br/>        devices = list(find(find_all=True))<br/>    <br/>        Finally, you can pass a custom backend to the find function:<br/>    <br/>        find(backend = MyBackend())<br/>    <br/>        PyUSB has builtin backends for libusb 0.1, libusb 1.0 and OpenUSB.  If you<br/>        do not supply a backend explicitly, find() function will select one of the<br/>        predefineds backends according to system availability.<br/>    <br/>        Backends are explained in the usb.backend module.<br/>        &quot;&quot;&quot;<br/>        def device_iter(**kwargs):<br/>            for dev in backend.enumerate_devices():<br/>                d = Device(dev, backend)<br/>                tests = (val == _try_getattr(d, key) for key, val in kwargs.items())<br/>                if _interop._all(tests) and (custom_match is None or custom_match(d)):<br/>                    yield d<br/>    <br/>        if backend is None:<br/>            import usb.backend.libusb1 as libusb1<br/>            import usb.backend.libusb0 as libusb0<br/>            import usb.backend.openusb as openusb<br/>    <br/>            for m in (libusb1, openusb, libusb0):<br/>                backend = m.get_backend()<br/>                if backend is not None:<br/>                    _logger.info(&#x27;find(): using backend &quot;%s&quot;&#x27;, m.__name__)<br/>                    break<br/>            else:<br/>&gt;               raise NoBackendError(&#x27;No backend available&#x27;)<br/><span class="error">E               usb.core.NoBackendError: No backend available</span><br/><br/>../../Library/Python/3.8/lib/python/site-packages/usb/core.py:1309: NoBackendError<br/></div></td></tr></tbody>
+      <tbody class="error results-table-row">
+        <tr>
+          <td class="col-result">Error</td>
+          <td class="col-name">test_usb.py::test_interface::setup</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">@pytest.fixture<br/>    def device():<br/>&gt;       return usb.core.find(idVendor=0x8457, idProduct=0x10263)<br/><br/>test_usb.py:8: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>find_all = False, backend = None, custom_match = None, args = {&#x27;idProduct&#x27;: 66147, &#x27;idVendor&#x27;: 33879}<br/>device_iter = &lt;function find.&lt;locals&gt;.device_iter at 0x1056da3a0&gt;<br/>libusb1 = &lt;module &#x27;usb.backend.libusb1&#x27; from &#x27;/Users/aciden/Library/Python/3.8/lib/python/site-packages/usb/backend/libusb1.py&#x27;&gt;<br/>libusb0 = &lt;module &#x27;usb.backend.libusb0&#x27; from &#x27;/Users/aciden/Library/Python/3.8/lib/python/site-packages/usb/backend/libusb0.py&#x27;&gt;<br/>openusb = &lt;module &#x27;usb.backend.openusb&#x27; from &#x27;/Users/aciden/Library/Python/3.8/lib/python/site-packages/usb/backend/openusb.py&#x27;&gt;<br/>m = &lt;module &#x27;usb.backend.libusb0&#x27; from &#x27;/Users/aciden/Library/Python/3.8/lib/python/site-packages/usb/backend/libusb0.py&#x27;&gt;<br/><br/>    def find(find_all=False, backend = None, custom_match = None, **args):<br/>        r&quot;&quot;&quot;Find an USB device and return it.<br/>    <br/>        find() is the function used to discover USB devices.  You can pass as<br/>        arguments any combination of the USB Device Descriptor fields to match a<br/>        device. For example:<br/>    <br/>        find(idVendor=0x3f4, idProduct=0x2009)<br/>    <br/>        will return the Device object for the device with idVendor field equals<br/>        to 0x3f4 and idProduct equals to 0x2009.<br/>    <br/>        If there is more than one device which matchs the criteria, the first one<br/>        found will be returned. If a matching device cannot be found the function<br/>        returns None. If you want to get all devices, you can set the parameter<br/>        find_all to True, then find will return an iterator with all matched devices.<br/>        If no matching device is found, it will return an empty iterator. Example:<br/>    <br/>        for printer in find(find_all=True, bDeviceClass=7):<br/>            print (printer)<br/>    <br/>        This call will get all the USB printers connected to the system.  (actually<br/>        may be not, because some devices put their class information in the<br/>        Interface Descriptor).<br/>    <br/>        You can also use a customized match criteria:<br/>    <br/>        dev = find(custom_match = lambda d: d.idProduct=0x3f4 and d.idvendor=0x2009)<br/>    <br/>        A more accurate printer finder using a customized match would be like<br/>        so:<br/>    <br/>        def is_printer(dev):<br/>            import usb.util<br/>            if dev.bDeviceClass == 7:<br/>                return True<br/>            for cfg in dev:<br/>                if usb.util.find_descriptor(cfg, bInterfaceClass=7) is not None:<br/>                    return True<br/>    <br/>        for printer in find(find_all=True, custom_match = is_printer):<br/>            print (printer)<br/>    <br/>        Now even if the device class code is in the interface descriptor the<br/>        printer will be found.<br/>    <br/>        You can combine a customized match with device descriptor fields. In this<br/>        case, the fields must match and the custom_match must return True. In the<br/>        our previous example, if we would like to get all printers belonging to the<br/>        manufacturer 0x3f4, the code would be like so:<br/>    <br/>        printers = list(find(find_all=True, idVendor=0x3f4, custom_match=is_printer))<br/>    <br/>        If you want to use find as a &#x27;list all devices&#x27; function, just call<br/>        it with find_all = True:<br/>    <br/>        devices = list(find(find_all=True))<br/>    <br/>        Finally, you can pass a custom backend to the find function:<br/>    <br/>        find(backend = MyBackend())<br/>    <br/>        PyUSB has builtin backends for libusb 0.1, libusb 1.0 and OpenUSB.  If you<br/>        do not supply a backend explicitly, find() function will select one of the<br/>        predefineds backends according to system availability.<br/>    <br/>        Backends are explained in the usb.backend module.<br/>        &quot;&quot;&quot;<br/>        def device_iter(**kwargs):<br/>            for dev in backend.enumerate_devices():<br/>                d = Device(dev, backend)<br/>                tests = (val == _try_getattr(d, key) for key, val in kwargs.items())<br/>                if _interop._all(tests) and (custom_match is None or custom_match(d)):<br/>                    yield d<br/>    <br/>        if backend is None:<br/>            import usb.backend.libusb1 as libusb1<br/>            import usb.backend.libusb0 as libusb0<br/>            import usb.backend.openusb as openusb<br/>    <br/>            for m in (libusb1, openusb, libusb0):<br/>                backend = m.get_backend()<br/>                if backend is not None:<br/>                    _logger.info(&#x27;find(): using backend &quot;%s&quot;&#x27;, m.__name__)<br/>                    break<br/>            else:<br/>&gt;               raise NoBackendError(&#x27;No backend available&#x27;)<br/><span class="error">E               usb.core.NoBackendError: No backend available</span><br/><br/>../../Library/Python/3.8/lib/python/site-packages/usb/core.py:1309: NoBackendError<br/></div></td></tr></tbody>
+      <tbody class="error results-table-row">
+        <tr>
+          <td class="col-result">Error</td>
+          <td class="col-name">test_usb.py::test_endpoint::setup</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">@pytest.fixture<br/>    def device():<br/>&gt;       return usb.core.find(idVendor=0x8457, idProduct=0x10263)<br/><br/>test_usb.py:8: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>find_all = False, backend = None, custom_match = None, args = {&#x27;idProduct&#x27;: 66147, &#x27;idVendor&#x27;: 33879}<br/>device_iter = &lt;function find.&lt;locals&gt;.device_iter at 0x1056da310&gt;<br/>libusb1 = &lt;module &#x27;usb.backend.libusb1&#x27; from &#x27;/Users/aciden/Library/Python/3.8/lib/python/site-packages/usb/backend/libusb1.py&#x27;&gt;<br/>libusb0 = &lt;module &#x27;usb.backend.libusb0&#x27; from &#x27;/Users/aciden/Library/Python/3.8/lib/python/site-packages/usb/backend/libusb0.py&#x27;&gt;<br/>openusb = &lt;module &#x27;usb.backend.openusb&#x27; from &#x27;/Users/aciden/Library/Python/3.8/lib/python/site-packages/usb/backend/openusb.py&#x27;&gt;<br/>m = &lt;module &#x27;usb.backend.libusb0&#x27; from &#x27;/Users/aciden/Library/Python/3.8/lib/python/site-packages/usb/backend/libusb0.py&#x27;&gt;<br/><br/>    def find(find_all=False, backend = None, custom_match = None, **args):<br/>        r&quot;&quot;&quot;Find an USB device and return it.<br/>    <br/>        find() is the function used to discover USB devices.  You can pass as<br/>        arguments any combination of the USB Device Descriptor fields to match a<br/>        device. For example:<br/>    <br/>        find(idVendor=0x3f4, idProduct=0x2009)<br/>    <br/>        will return the Device object for the device with idVendor field equals<br/>        to 0x3f4 and idProduct equals to 0x2009.<br/>    <br/>        If there is more than one device which matchs the criteria, the first one<br/>        found will be returned. If a matching device cannot be found the function<br/>        returns None. If you want to get all devices, you can set the parameter<br/>        find_all to True, then find will return an iterator with all matched devices.<br/>        If no matching device is found, it will return an empty iterator. Example:<br/>    <br/>        for printer in find(find_all=True, bDeviceClass=7):<br/>            print (printer)<br/>    <br/>        This call will get all the USB printers connected to the system.  (actually<br/>        may be not, because some devices put their class information in the<br/>        Interface Descriptor).<br/>    <br/>        You can also use a customized match criteria:<br/>    <br/>        dev = find(custom_match = lambda d: d.idProduct=0x3f4 and d.idvendor=0x2009)<br/>    <br/>        A more accurate printer finder using a customized match would be like<br/>        so:<br/>    <br/>        def is_printer(dev):<br/>            import usb.util<br/>            if dev.bDeviceClass == 7:<br/>                return True<br/>            for cfg in dev:<br/>                if usb.util.find_descriptor(cfg, bInterfaceClass=7) is not None:<br/>                    return True<br/>    <br/>        for printer in find(find_all=True, custom_match = is_printer):<br/>            print (printer)<br/>    <br/>        Now even if the device class code is in the interface descriptor the<br/>        printer will be found.<br/>    <br/>        You can combine a customized match with device descriptor fields. In this<br/>        case, the fields must match and the custom_match must return True. In the<br/>        our previous example, if we would like to get all printers belonging to the<br/>        manufacturer 0x3f4, the code would be like so:<br/>    <br/>        printers = list(find(find_all=True, idVendor=0x3f4, custom_match=is_printer))<br/>    <br/>        If you want to use find as a &#x27;list all devices&#x27; function, just call<br/>        it with find_all = True:<br/>    <br/>        devices = list(find(find_all=True))<br/>    <br/>        Finally, you can pass a custom backend to the find function:<br/>    <br/>        find(backend = MyBackend())<br/>    <br/>        PyUSB has builtin backends for libusb 0.1, libusb 1.0 and OpenUSB.  If you<br/>        do not supply a backend explicitly, find() function will select one of the<br/>        predefineds backends according to system availability.<br/>    <br/>        Backends are explained in the usb.backend module.<br/>        &quot;&quot;&quot;<br/>        def device_iter(**kwargs):<br/>            for dev in backend.enumerate_devices():<br/>                d = Device(dev, backend)<br/>                tests = (val == _try_getattr(d, key) for key, val in kwargs.items())<br/>                if _interop._all(tests) and (custom_match is None or custom_match(d)):<br/>                    yield d<br/>    <br/>        if backend is None:<br/>            import usb.backend.libusb1 as libusb1<br/>            import usb.backend.libusb0 as libusb0<br/>            import usb.backend.openusb as openusb<br/>    <br/>            for m in (libusb1, openusb, libusb0):<br/>                backend = m.get_backend()<br/>                if backend is not None:<br/>                    _logger.info(&#x27;find(): using backend &quot;%s&quot;&#x27;, m.__name__)<br/>                    break<br/>            else:<br/>&gt;               raise NoBackendError(&#x27;No backend available&#x27;)<br/><span class="error">E               usb.core.NoBackendError: No backend available</span><br/><br/>../../Library/Python/3.8/lib/python/site-packages/usb/core.py:1309: NoBackendError<br/></div></td></tr></tbody>
+      <tbody class="error results-table-row">
+        <tr>
+          <td class="col-result">Error</td>
+          <td class="col-name">test_usb.py::test_write::setup</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">@pytest.fixture<br/>    def device():<br/>&gt;       return usb.core.find(idVendor=0x8457, idProduct=0x10263)<br/><br/>test_usb.py:8: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>find_all = False, backend = None, custom_match = None, args = {&#x27;idProduct&#x27;: 66147, &#x27;idVendor&#x27;: 33879}<br/>device_iter = &lt;function find.&lt;locals&gt;.device_iter at 0x105e97160&gt;<br/>libusb1 = &lt;module &#x27;usb.backend.libusb1&#x27; from &#x27;/Users/aciden/Library/Python/3.8/lib/python/site-packages/usb/backend/libusb1.py&#x27;&gt;<br/>libusb0 = &lt;module &#x27;usb.backend.libusb0&#x27; from &#x27;/Users/aciden/Library/Python/3.8/lib/python/site-packages/usb/backend/libusb0.py&#x27;&gt;<br/>openusb = &lt;module &#x27;usb.backend.openusb&#x27; from &#x27;/Users/aciden/Library/Python/3.8/lib/python/site-packages/usb/backend/openusb.py&#x27;&gt;<br/>m = &lt;module &#x27;usb.backend.libusb0&#x27; from &#x27;/Users/aciden/Library/Python/3.8/lib/python/site-packages/usb/backend/libusb0.py&#x27;&gt;<br/><br/>    def find(find_all=False, backend = None, custom_match = None, **args):<br/>        r&quot;&quot;&quot;Find an USB device and return it.<br/>    <br/>        find() is the function used to discover USB devices.  You can pass as<br/>        arguments any combination of the USB Device Descriptor fields to match a<br/>        device. For example:<br/>    <br/>        find(idVendor=0x3f4, idProduct=0x2009)<br/>    <br/>        will return the Device object for the device with idVendor field equals<br/>        to 0x3f4 and idProduct equals to 0x2009.<br/>    <br/>        If there is more than one device which matchs the criteria, the first one<br/>        found will be returned. If a matching device cannot be found the function<br/>        returns None. If you want to get all devices, you can set the parameter<br/>        find_all to True, then find will return an iterator with all matched devices.<br/>        If no matching device is found, it will return an empty iterator. Example:<br/>    <br/>        for printer in find(find_all=True, bDeviceClass=7):<br/>            print (printer)<br/>    <br/>        This call will get all the USB printers connected to the system.  (actually<br/>        may be not, because some devices put their class information in the<br/>        Interface Descriptor).<br/>    <br/>        You can also use a customized match criteria:<br/>    <br/>        dev = find(custom_match = lambda d: d.idProduct=0x3f4 and d.idvendor=0x2009)<br/>    <br/>        A more accurate printer finder using a customized match would be like<br/>        so:<br/>    <br/>        def is_printer(dev):<br/>            import usb.util<br/>            if dev.bDeviceClass == 7:<br/>                return True<br/>            for cfg in dev:<br/>                if usb.util.find_descriptor(cfg, bInterfaceClass=7) is not None:<br/>                    return True<br/>    <br/>        for printer in find(find_all=True, custom_match = is_printer):<br/>            print (printer)<br/>    <br/>        Now even if the device class code is in the interface descriptor the<br/>        printer will be found.<br/>    <br/>        You can combine a customized match with device descriptor fields. In this<br/>        case, the fields must match and the custom_match must return True. In the<br/>        our previous example, if we would like to get all printers belonging to the<br/>        manufacturer 0x3f4, the code would be like so:<br/>    <br/>        printers = list(find(find_all=True, idVendor=0x3f4, custom_match=is_printer))<br/>    <br/>        If you want to use find as a &#x27;list all devices&#x27; function, just call<br/>        it with find_all = True:<br/>    <br/>        devices = list(find(find_all=True))<br/>    <br/>        Finally, you can pass a custom backend to the find function:<br/>    <br/>        find(backend = MyBackend())<br/>    <br/>        PyUSB has builtin backends for libusb 0.1, libusb 1.0 and OpenUSB.  If you<br/>        do not supply a backend explicitly, find() function will select one of the<br/>        predefineds backends according to system availability.<br/>    <br/>        Backends are explained in the usb.backend module.<br/>        &quot;&quot;&quot;<br/>        def device_iter(**kwargs):<br/>            for dev in backend.enumerate_devices():<br/>                d = Device(dev, backend)<br/>                tests = (val == _try_getattr(d, key) for key, val in kwargs.items())<br/>                if _interop._all(tests) and (custom_match is None or custom_match(d)):<br/>                    yield d<br/>    <br/>        if backend is None:<br/>            import usb.backend.libusb1 as libusb1<br/>            import usb.backend.libusb0 as libusb0<br/>            import usb.backend.openusb as openusb<br/>    <br/>            for m in (libusb1, openusb, libusb0):<br/>                backend = m.get_backend()<br/>                if backend is not None:<br/>                    _logger.info(&#x27;find(): using backend &quot;%s&quot;&#x27;, m.__name__)<br/>                    break<br/>            else:<br/>&gt;               raise NoBackendError(&#x27;No backend available&#x27;)<br/><span class="error">E               usb.core.NoBackendError: No backend available</span><br/><br/>../../Library/Python/3.8/lib/python/site-packages/usb/core.py:1309: NoBackendError<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_internet.py::test_iface_info</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_internet.py::test_tcp_conn</td>
+          <td class="col-duration">0.02</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_internet.py::test_http_status_code</td>
+          <td class="col-duration">0.63</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody></table></body></html>
